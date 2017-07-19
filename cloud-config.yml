@@ -1,0 +1,63 @@
+#cloud-config
+write_files:
+  - path: /etc/auth-gcr.sh
+    permissions: 0744
+    owner: root
+    content: |
+      #!/bin/bash
+      METADATA=http://169.254.169.254/computeMetadata/v1
+      SVC_ACCT=$METADATA/instance/service-accounts/default
+      ACCESS_TOKEN=$(curl -H 'Metadata-Flavor: Google' $SVC_ACCT/token | cut -d'"' -f 4)
+      /usr/bin/docker login -e not@val.id -u _token -p $ACCESS_TOKEN https://gcr.io
+
+coreos:
+  units:
+    - name: docker.service
+      command: start
+
+    - name: redis.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run redis
+        Requires=docker.service
+
+        [Service]
+        TimeoutSec=180
+        Restart=always
+        RestartSec=30
+        ExecStartPre=-/usr/bin/docker kill redis
+        ExecStartPre=-/usr/bin/docker rm -fv redis
+        ExecStartPre=-/usr/bin/docker pull redis
+        ExecStart=/usr/bin/docker run --name redis redis
+        ExecStop=/usr/bin/docker stop redis
+
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: hubot.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run hubot for Slack
+        Requires=redis.service
+
+        [Service]
+        TimeoutSec=180
+        Restart=always
+        RestartSec=30
+        ExecStartPre=-/usr/bin/docker kill hubot
+        ExecStartPre=-/usr/bin/docker rm -fv hubot
+        ExecStartPre=-/bin/bash /etc/auth-gcr.sh
+        ExecStartPre=-/usr/bin/docker pull gcr.io/jscaduto-dev/hubot-slack
+        ExecStart=/usr/bin/docker run \
+                    --link redis:redis \
+                    -p 8080:8080 \
+                    -e HUBOT_NAME=hubot \
+                    -e HUBOT_SLACK_TOKEN=${HUBOT_SLACK_TOKEN} \
+                    --name hubot \
+                    gcr.io/jscaduto-dev/hubot-slack
+        ExecStop=/usr/bin/docker stop hubot
+
+        [Install]
+        WantedBy=multi-user.target
