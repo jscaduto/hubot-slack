@@ -15,26 +15,6 @@ coreos:
     - name: docker.service
       command: start
 
-    - name: redis.service
-      command: start
-      content: |
-        [Unit]
-        Description=Run redis
-        Requires=docker.service
-
-        [Service]
-        TimeoutSec=180
-        Restart=always
-        RestartSec=30
-        ExecStartPre=-/usr/bin/docker kill redis
-        ExecStartPre=-/usr/bin/docker rm -fv redis
-        ExecStartPre=-/usr/bin/docker pull redis
-        ExecStart=/usr/bin/docker run --name redis redis
-        ExecStop=/usr/bin/docker stop redis
-
-        [Install]
-        WantedBy=multi-user.target
-
     - name: hubot.service
       command: start
       content: |
@@ -58,6 +38,26 @@ coreos:
                     --name hubot \
                     gcr.io/jscaduto-dev/hubot-slack
         ExecStop=/usr/bin/docker stop hubot
+
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: redis.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run redis
+        Requires=docker.service
+
+        [Service]
+        TimeoutSec=180
+        Restart=always
+        RestartSec=30
+        ExecStartPre=-/usr/bin/docker kill redis
+        ExecStartPre=-/usr/bin/docker rm -fv redis
+        ExecStartPre=-/usr/bin/docker pull redis
+        ExecStart=/usr/bin/docker run --name redis redis
+        ExecStop=/usr/bin/docker stop redis
 
         [Install]
         WantedBy=multi-user.target
